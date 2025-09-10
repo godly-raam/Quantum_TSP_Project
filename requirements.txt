@@ -1,8 +1,19 @@
+# requirements.txt
+
+# Core API dependencies
 fastapi==0.111.0
-uvicorn==0.30.1
+uvicorn[standard]==0.30.1
 pydantic==2.8.2
+
+# Scientific computing
 numpy==1.26.4
+scipy==1.11.4
+
+# Quantum computing stack (pinned versions for compatibility)
 qiskit==1.1.0
 qiskit-aer==0.14.2
 qiskit-algorithms==0.3.0
 qiskit-optimization==0.7.0
+
+# Utilities
+python-multipart==0.0.6

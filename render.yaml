@@ -1,0 +1,25 @@
+# render.yaml
+
+services:
+  - type: web
+    name: q-fleet-backend
+    runtime: python # This was changed from 'env'
+    plan: starter
+    
+    # The command to install all your dependencies
+    buildCommand: pip install -r requirements.txt
+    
+    # The command to run your live API server
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+    
+    # The health check path must match the endpoint in main.py
+    healthCheckPath: /api/health
+
+    # Environment variables to optimize performance for scientific computing
+    envVars:
+      - key: PYTHONPATH
+        value: .
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
