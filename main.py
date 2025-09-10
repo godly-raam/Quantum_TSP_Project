@@ -1,9 +1,14 @@
 # main.py
 
+import sys
+# This tells Python to also look for files in the 'modules' directory
+sys.path.append('./modules')
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import numpy as np
+# This import will now work correctly
 from modules import quantum_solver
 
 app = FastAPI()
