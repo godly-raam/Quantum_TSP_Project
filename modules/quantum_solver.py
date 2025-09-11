@@ -31,12 +31,19 @@ def _calculate_route_distances(routes: List[List[int]], distance_matrix: np.ndar
             route_distance = 0.0
             if len(route) >= 2:
                 for i in range(len(route) - 1):
-                    route_distance += distance_matrix[route[i], route[i+1]]
-            distances.append(route_distance)
+                    dist_value = distance_matrix[route[i], route[i+1]]
+                    # FIX: Handle numpy arrays and scalars properly
+                    if isinstance(dist_value, np.ndarray):
+                        dist_value = float(dist_value.item())
+                    else:
+                        dist_value = float(dist_value)
+                    route_distance += dist_value
+            distances.append(float(route_distance))
             total_distance += route_distance
-        except (TypeError, IndexError, ValueError):
+        except (TypeError, IndexError, ValueError) as e:
+            logger.warning(f"Error calculating route distance: {e}")
             distances.append(0.0)
-    return distances, total_distance
+    return distances, float(total_distance)
 
 def _create_classical_fallback(distance_matrix: np.ndarray, num_vehicles: int, depot_node: int) -> List[List[int]]:
     """Creates a simple 'greedy' classical solution if the quantum solver fails."""
@@ -57,6 +64,8 @@ def solve_quantum_vrp(distance_matrix: np.ndarray, num_vehicles: int, depot_node
     start_time = time.time()
     
     try:
+        logger.info(f"Starting quantum VRP solver with {distance_matrix.shape[0]} locations, {num_vehicles} vehicles")
+        
         vrp_problem = VehicleRouting(distance_matrix, num_vehicles=num_vehicles, depot=depot_node)
         qp = vrp_problem.to_quadratic_program()
         
@@ -67,30 +76,62 @@ def solve_quantum_vrp(distance_matrix: np.ndarray, num_vehicles: int, depot_node
         eigen_optimizer = MinimumEigenOptimizer(min_eigen_solver=qaoa)
         result = eigen_optimizer.solve(qp)
         
-        routes = vrp_problem.interpret(result)
+        logger.info("Quantum optimization completed, interpreting results...")
         
-        if not any(routes):
-            raise ValueError("Quantum algorithm returned all empty routes.")
-
-        is_valid_quantum = True
-        notes = "Optimal routes found using QAOA."
+        # FIX: Handle the result interpretation more carefully
+        try:
+            routes = vrp_problem.interpret(result)
+            logger.info(f"Raw routes from quantum solver: {routes}")
+            
+            # Ensure routes are in the correct format
+            if not routes or not any(routes):
+                raise ValueError("Quantum algorithm returned empty routes.")
+                
+            # Convert routes to proper format if needed
+            formatted_routes = []
+            for route in routes:
+                if isinstance(route, (list, tuple, np.ndarray)):
+                    # Convert numpy arrays to lists and ensure integers
+                    formatted_route = [int(x) for x in route]
+                    formatted_routes.append(formatted_route)
+                else:
+                    logger.warning(f"Unexpected route format: {type(route)}")
+                    
+            if not formatted_routes:
+                raise ValueError("No valid routes after formatting.")
+                
+            routes = formatted_routes
+            is_valid_quantum = True
+            notes = "Optimal routes found using QAOA."
+            
+        except Exception as interpret_error:
+            logger.error(f"Error interpreting quantum result: {interpret_error}")
+            raise interpret_error
 
     except Exception as e:
         logger.error(f"Quantum solver failed: {e}. Switching to classical fallback.")
         routes = _create_classical_fallback(distance_matrix, num_vehicles, depot_node)
         is_valid_quantum = False
-        notes = "Quantum solver failed to converge; a classical fallback solution is provided."
+        notes = f"Quantum solver failed ({str(e)}); using classical fallback solution."
 
-    # *** THIS IS THE CORRECTED PART ***
-    # Ensure distances are calculated correctly and total_distance is a float
-    distances, total_distance = _calculate_route_distances(routes, distance_matrix)
+    # Calculate distances with proper error handling
+    try:
+        distances, total_distance = _calculate_route_distances(routes, distance_matrix)
+        logger.info(f"Calculated distances: {distances}, total: {total_distance}")
+    except Exception as dist_error:
+        logger.error(f"Error calculating distances: {dist_error}")
+        distances = [0.0] * len(routes)
+        total_distance = 0.0
+    
     execution_time = time.time() - start_time
     
     metrics = SolutionMetrics(
         is_valid_quantum_solution=is_valid_quantum,
-        total_distance=float(total_distance), # Explicitly cast to float
-        execution_time=execution_time,
+        total_distance=float(total_distance),
+        execution_time=float(execution_time),
         notes=notes
     )
+    
+    logger.info(f"VRP solver completed in {execution_time:.2f}s. Routes: {len(routes)}, Total distance: {total_distance:.2f}")
     
     return routes, distances, metrics
