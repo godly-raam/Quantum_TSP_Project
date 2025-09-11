@@ -1,4 +1,4 @@
-# main.py
+# main.py - Final Fix for CORS
 
 import os
 import sys
@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field, validator
 import numpy as np
 from modules import quantum_solver
 
-# Configure professional logging for Render
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -24,18 +23,19 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS Middleware allows your Vercel frontend to connect
+# --- THIS IS THE CORRECTED PART ---
+# More permissive CORS settings to handle preflight requests correctly.
 origins = [
     "https://entangled-minds-qc.vercel.app",
-    "https://*.vercel.app", # Allows Vercel preview deployments
-    "http://localhost:5173",
+    "https://*.vercel.app",
+    "http://localhost:3000",
 ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"], # Allow all methods
+    allow_headers=["*"], # Allow all headers
 )
 
 # Pydantic models for robust API contracts
@@ -56,30 +56,25 @@ class VrpResponse(BaseModel):
 
 @app.middleware("http")
 async def add_process_time_header(request, call_next):
-    """This middleware adds a custom header to the response to measure total processing time."""
     start_time = time.time()
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(round(process_time, 3))
     return response
 
-# The health check endpoint is used by Render to ensure your service is running.
 @app.get("/api/health")
 def health_check():
-    """A health check endpoint for Render to monitor the service."""
     logger.info("Health check endpoint was called.")
     return {"status": "healthy", "message": "Q-Fleet API is running!"}
 
 @app.post("/api/optimize", response_model=VrpResponse)
 def optimize_routes(problem: VrpProblem):
-    """This is the main endpoint that solves the VRP."""
     logger.info(f"Received VRP request: {problem.dict()}")
     try:
         np.random.seed(123)
         depot_node = 0
         coords = np.random.randn(problem.num_locations + 1, 2) * 0.1 + [16.5, 80.5]
         
-        # *** THIS IS THE CORRECTED LINE ***
         distance_matrix = np.zeros((problem.num_locations + 1, problem.num_locations + 1))
         for i in range(problem.num_locations + 1):
             for j in range(i + 1, problem.num_locations + 1):
@@ -106,5 +101,4 @@ def optimize_routes(problem: VrpProblem):
             "notes": metrics.notes
         }
     except Exception as e:
-        # This will catch any unexpected errors and return a clean error to the frontend
         raise HTTPException(status_code=500, detail=f"An internal error occurred: {str(e)}")
