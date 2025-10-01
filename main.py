@@ -60,9 +60,9 @@ async def cors_handler(request: Request, call_next):
 
 # Pydantic models for robust API contracts
 class VrpProblem(BaseModel):
-    num_locations: int = Field(..., ge=2, le=8, description="Number of locations (2-8)")
-    num_vehicles: int = Field(..., ge=1, le=4, description="Number of vehicles (1-4)")
-    reps: int = Field(5, ge=1, le=8, description="QAOA Quality (repetitions)")
+    num_locations: int = Field(..., ge=2, le=6, description="Number of locations (2-6)")
+    num_vehicles: int = Field(..., ge=1, le=3, description="Number of vehicles (1-3)")
+    reps: int = Field(4, ge=1, le=6, description="QAOA depth (1-6)")
 
 class VrpResponse(BaseModel):
     routes: list
